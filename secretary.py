@@ -1,5 +1,6 @@
 import json
-import os
+from typing import Any, Dict, Tuple
+
 import openai
 from log.custom_logger import log
 
@@ -33,7 +34,7 @@ class Secretary:
         :returns: loan_format_check, fail_response, loan
     """
 
-    def check_loan(self, resp, max_loan) -> (bool, str, dict):
+    def check_loan(self, resp, max_loan) -> Tuple[bool, str, Dict[str, Any] | None]:
         # format check
         if isinstance(resp, str) and resp.count('{') == 1 and resp.count('}') == 1:
             start_idx = resp.index('{')
@@ -90,12 +91,19 @@ class Secretary:
 
             log.logger.error("UNSOLVED LOAN JSON RESPONSE:{}".format(parsed_json))
             return False, "", None
-        except Exception as e:
-            log.logger.error("UNSOLVED LOAN JSON RESPONSE:{}".format(parsed_json))
+        except Exception:
+            log.logger.error("UNSOLVED LOAN JSON RESPONSE: %s", parsed_json, exc_info=True)
             return False, "", None
 
-    def check_action(self, resp, cash, stock_a_amount,
-                     stock_b_amount, stock_a_price, stock_b_price) -> (bool, str, dict):
+    def check_action(
+        self,
+        resp,
+        cash,
+        stock_a_amount,
+        stock_b_amount,
+        stock_a_price,
+        stock_b_price,
+    ) -> Tuple[bool, str, Dict[str, Any] | None]:
         # format check
         if isinstance(resp, str) and resp.count('{') == 1 and resp.count('}') == 1:
             start_idx = resp.index('{')
@@ -117,7 +125,6 @@ class Secretary:
 
         # content check
         try:
-            prices = {"A": stock_a_price, "B": stock_b_price}
             holds = {"A": stock_a_amount, "B": stock_b_amount}
             if "action_type" not in parsed_json:
                 log.logger.debug("Wrong json content in response: {}".format(resp))
@@ -148,15 +155,14 @@ class Secretary:
                     return False, fail_response, None
                 if parsed_json["price"] <= 0:
                     log.logger.debug("Wrong json content in response: {}".format(resp))
-                    fail_response = f"Value of key 'price' should be positive."
+                    fail_response = "Value of key 'price' should be positive."
                     return False, fail_response, None
                 if not isinstance(parsed_json["amount"], int):
                     log.logger.debug("Wrong json content in response: {}".format(resp))
-                    fail_response = f"Value of key 'amount' should be integer."
+                    fail_response = "Value of key 'amount' should be integer."
                     return False, fail_response, None
 
                 # buy more than cash or sell more than hold amount
-                # price = prices[parsed_json["stock"]]
                 price = parsed_json["price"]
                 if parsed_json["action_type"].lower() == "buy":
                     if parsed_json["amount"] <= 0 or parsed_json["amount"] * price > cash:
@@ -176,8 +182,8 @@ class Secretary:
                         return False, fail_response, None
                 return True, "", parsed_json
 
-        except Exception as e:
-            log.logger.error("UNSOLVED ACTION JSON RESPONSE:{}".format(parsed_json))
+        except Exception:
+            log.logger.error("UNSOLVED ACTION JSON RESPONSE: %s", parsed_json, exc_info=True)
             return False, "", None
 
     def check_estimate(self, resp):
@@ -216,6 +222,6 @@ class Secretary:
                     return False, fail_response, None
             return True, "", parsed_json
 
-        except Exception as e:
-            log.logger.error("UNSOLVED ESTIMATE JSON RESPONSE:{}".format(parsed_json))
+        except Exception:
+            log.logger.error("UNSOLVED ESTIMATE JSON RESPONSE: %s", parsed_json, exc_info=True)
             return False, "", None

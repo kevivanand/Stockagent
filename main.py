@@ -1,8 +1,6 @@
 import argparse
 import random
-import pandas as pd
-import openai
-import tiktoken
+from typing import Optional
 
 import util
 from agent import Agent
@@ -11,7 +9,7 @@ from stock import Stock
 from log.custom_logger import log
 from record import create_stock_record, create_trade_record, AgentRecordDaily, create_agentses_record
 
-def get_agent(all_agents, order):
+def get_agent(all_agents, order) -> Optional[Agent]:
     for agent in all_agents:
         if agent.order == order:
             return agent
@@ -19,15 +17,25 @@ def get_agent(all_agents, order):
 
 def handle_action(action, stock_deals, all_agents, stock, session):
     # action = JSON{"agent": 1, "action_type": "buy"|"sell", "stock": "A"|"B", "amount": 10, "price": 10}
+    acting_agent = get_agent(all_agents, action["agent"])
+    if acting_agent is None:
+        log.logger.error("handle_action error: agent %s not found", action["agent"])
+        return
     try:
         if action["action_type"] == "buy":
             for sell_action in stock_deals["sell"][:]:
                 if action["price"] == sell_action["price"]:
                     # 交易成交
                     close_amount = min(action["amount"], sell_action["amount"])
-                    get_agent(all_agents, action["agent"]).buy_stock(stock.name, close_amount, action["price"])
-                    if not sell_action["agent"] == -1:  # B发行
-                        get_agent(all_agents, sell_action["agent"]).sell_stock(stock.name, close_amount, action["price"])
+                    acting_agent.buy_stock(stock.name, close_amount, action["price"])
+                    seller_order = sell_action["agent"]
+                    if seller_order != -1:  # B发行
+                        seller_agent = get_agent(all_agents, seller_order)
+                        if seller_agent is None:
+                            log.logger.error("handle_action error: seller agent %s not found", seller_order)
+                            stock_deals["sell"].remove(sell_action)
+                            continue
+                        seller_agent.sell_stock(stock.name, close_amount, action["price"])
                     stock.add_session_deal({"price": action["price"], "amount": close_amount})
                     create_trade_record(action["date"], session, stock.name, action["agent"], sell_action["agent"],
                                         close_amount, action["price"])
@@ -50,8 +58,13 @@ def handle_action(action, stock_deals, all_agents, stock, session):
                 if action["price"] == buy_action["price"]:
                     # 交易成交
                     close_amount = min(action["amount"], buy_action["amount"])
-                    get_agent(all_agents, action["agent"]).sell_stock(stock.name, close_amount, action["price"])
-                    get_agent(all_agents, buy_action["agent"]).buy_stock(stock.name, close_amount, action["price"])
+                    acting_agent.sell_stock(stock.name, close_amount, action["price"])
+                    buyer_agent = get_agent(all_agents, buy_action["agent"])
+                    if buyer_agent is None:
+                        log.logger.error("handle_action error: buyer agent %s not found", buy_action["agent"])
+                        stock_deals["buy"].remove(buy_action)
+                        continue
+                    buyer_agent.buy_stock(stock.name, close_amount, action["price"])
                     stock.add_session_deal({"price": action["price"], "amount": close_amount})
                     create_trade_record(action["date"], session, stock.name, buy_action["agent"], action["agent"],
                                         close_amount, action["price"])
@@ -140,7 +153,7 @@ def simulation(args):
         daily_agent_records = []
         for agent in all_agents:
             loan = agent.plan_loan(date, stock_a.get_price(), stock_b.get_price(), last_day_forum_message)
-            daily_agent_records.append(AgentRecordDaily(date, agent.order, loan))
+            daily_agent_records.append(AgentRecordDaily(agent.order, date, loan))
 
         for session in range(1, util.TOTAL_SESSION + 1):
             log.logger.debug(f"SESSION {session}")
@@ -183,7 +196,6 @@ def simulation(args):
         last_day_forum_message.clear()
         log.logger.debug(f"DAY {date} ends, display forum messages...")
         for agent in all_agents:
-            chat_history = agent.chat_history
             message = agent.post_message()
             log.logger.info("Agent {} says: {}".format(agent.order, message))
             last_day_forum_message.append({"name": agent.order, "message": message})

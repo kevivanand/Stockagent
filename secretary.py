@@ -99,10 +99,8 @@ class Secretary:
         self,
         resp,
         cash,
-        stock_a_amount,
-        stock_b_amount,
-        stock_a_price,
-        stock_b_price,
+        holdings: Dict[str, int],
+        prices: Dict[str, float]
     ) -> Tuple[bool, str, Dict[str, Any] | None]:
         # format check
         if isinstance(resp, str) and resp.count('{') == 1 and resp.count('}') == 1:
@@ -125,7 +123,7 @@ class Secretary:
 
         # content check
         try:
-            holds = {"A": stock_a_amount, "B": stock_b_amount}
+            # holds = holdings
             if "action_type" not in parsed_json:
                 log.logger.debug("Wrong json content in response: {}".format(resp))
                 fail_response = "Key 'action_type' not in response."
@@ -149,9 +147,9 @@ class Secretary:
                     fail_response = "Should include stock, amount and price in response " \
                                     "if value of key 'action_type' is buy or sell."
                     return False, fail_response, None
-                if parsed_json["stock"] not in ['A', 'B']:
+                if not isinstance(parsed_json["stock"], str):
                     log.logger.debug("Wrong json content in response: {}".format(resp))
-                    fail_response = "Value of key 'stock' should be 'A' or 'B'."
+                    fail_response = "Value of key 'stock' should be a string symbol."
                     return False, fail_response, None
                 if parsed_json["price"] <= 0:
                     log.logger.debug("Wrong json content in response: {}".format(resp))
@@ -172,7 +170,7 @@ class Secretary:
                                         f"should be positive and not exceed cash."
                         return False, fail_response, None
 
-                hold_amount = holds[parsed_json["stock"]]
+                hold_amount = holdings.get(parsed_json["stock"], 0)
                 if parsed_json["action_type"].lower() == "sell":
                     if parsed_json["amount"] <= 0 or parsed_json["amount"] > hold_amount:
                         log.logger.debug("Sell more than hold: {}".format(resp))

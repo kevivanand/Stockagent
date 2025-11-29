@@ -16,7 +16,7 @@ class TradeRecord:
         if os.path.isfile(file_name):
             existing_df = pd.read_excel(file_name)
         else:
-            existing_df = pd.DataFrame(columns=["交易日", "交易阶段", "股票类型", "买入交易员", "卖出交易员", "交易数量", "交易价格"])
+            existing_df = pd.DataFrame(columns=["Date", "Session", "Stock Type", "Buyer", "Seller", "Quantity", "Price"])
 
         # 将新的交易记录合并到现有DataFrame
         new_records = [[self.date, self.session, self.stock_type, self.buyer, self.seller, self.quantity, self.price]]
@@ -44,7 +44,7 @@ class StockRecord:
         if os.path.isfile(file_name):
             existing_df = pd.read_excel(file_name)
         else:
-            existing_df = pd.DataFrame(columns=["交易日", "第几个交易阶段", "阶段结束后股票A价格", "阶段结束后股票B价格"])
+            existing_df = pd.DataFrame(columns=["Date", "Session", "NIFTY Price", "Option Price"])
 
         # 将新的交易记录合并到现有DataFrame
         new_records = [[self.date, self.session, self.stock_a_price, self.stock_b_price]]
@@ -77,18 +77,18 @@ class AgentRecordDaily:
         self.will_sell_b = "no"
 
     def add_estimate(self, js):
-        self.will_loan = js["loan"]
-        self.will_buy_a = js["buy_A"]
-        self.will_sell_a = js["sell_A"]
-        self.will_buy_b = js["buy_B"]
-        self.will_sell_b = js["sell_B"]
+        self.will_loan = js.get("loan", "no")
+        self.will_buy_a = js.get("buy_NIFTY", "no")
+        self.will_sell_a = js.get("sell_NIFTY", "no")
+        self.will_buy_b = js.get("buy_OPTION", "no")
+        self.will_sell_b = js.get("sell_OPTION", "no")
 
     def write_to_excel(self, file_name="res/agent_day_record.xlsx"):
         if os.path.isfile(file_name):
             existing_df = pd.read_excel(file_name)
         else:
-            existing_df = pd.DataFrame(columns=["交易员", "交易日", "是否贷款", "贷款类型", "贷款数量",
-                                                "明日是否贷款", "明日是否买入A", "明日是否卖出A", "明日是否买入B", "明日是否卖出B"])
+            existing_df = pd.DataFrame(columns=["Agent", "Date", "Loan Taken?", "Loan Type", "Loan Amount",
+                                                "Will Loan?", "Will Buy NIFTY?", "Will Sell NIFTY?", "Will Buy Option?", "Will Sell Option?"])
 
         # 将新的交易记录合并到现有DataFrame
         new_records = [[self.agent, self.date, self.if_loan, self.loan_type, self.loan_amount,
@@ -121,9 +121,9 @@ class AgentRecordSession:
         if os.path.isfile(file_name):
             existing_df = pd.read_excel(file_name)
         else:
-            existing_df = pd.DataFrame(columns=["交易员", "交易日", "交易阶段", "交易前资产总额",
-                                                "交易前持有现金", "交易前持有的A股价值", "交易前持有的B股价值",
-                                                "挂单类型", "挂单股票类别", "挂单数量", "挂单价格"])
+            existing_df = pd.DataFrame(columns=["Agent", "Date", "Session", "Total Assets",
+                                                "Cash", "Stock Value", "Option Value",
+                                                "Order Type", "Stock Symbol", "Order Amount", "Order Price"])
 
         # 将新的交易记录合并到现有DataFrame
         new_records = [[self.agent, self.date, self.session, self.proper, self.cash,
